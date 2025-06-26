@@ -1,11 +1,12 @@
-// lib/appwrite.ts
-import { Client, Account, Databases, ID, Query } from 'appwrite';
+import { UserHealthProfile } from '@/context/UserHealthContext';
+import { Account, Client, Databases, ID, Query } from 'appwrite';
 
 // Get configuration from environment variables with validation
 const APPWRITE_ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT as string;
 const APPWRITE_PROJECT_ID = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID as string;
 const APPWRITE_DATABASE_ID = process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID as string;
 const APPWRITE_USER_COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_USER_COLLECTION_ID as string;
+const APPWRITE_HEALTH_PROFILE_COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_HEALTH_PROFILE_COLLECTION_ID as string;
 
 // Validate that all required environment variables are set
 if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !APPWRITE_DATABASE_ID || !APPWRITE_USER_COLLECTION_ID) {
@@ -21,20 +22,10 @@ class AppwriteService {
     this.client = new Client();
     this.client
       .setEndpoint(APPWRITE_ENDPOINT)
-      .setProject(APPWRITE_PROJECT_ID);
+      .setProject(APPWRITE_PROJECT_ID)
 
     this.account = new Account(this.client);
     this.databases = new Databases(this.client);
-  }
-
-  // Helper method to check if user is authenticated
-  async isAuthenticated() {
-    try {
-      await this.account.getSession('current');
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   // Auth Methods
@@ -49,8 +40,7 @@ class AppwriteService {
       
       if (userAccount) {
         // Auto sign in after account creation
-        const session = await this.signIn(email, password);
-        return { userAccount, session };
+        return this.signIn(email, password);
       } else {
         return userAccount;
       }
@@ -62,14 +52,7 @@ class AppwriteService {
 
   async signIn(email: string, password: string) {
     try {
-      const session = await this.account.createEmailPasswordSession(email, password);
-      
-      // Verify session was created successfully
-      if (session) {
-        console.log('Session created successfully:', session.$id);
-      }
-      
-      return session;
+      return await this.account.createEmailPasswordSession(email, password);
     } catch (error) {
       console.log('Appwrite service :: signIn :: error', error);
       throw error;
@@ -78,15 +61,7 @@ class AppwriteService {
 
   async getCurrentUser() {
     try {
-      // First check if there's an active session
-      const isAuth = await this.isAuthenticated();
-      // if (!isAuth) {
-      //   console.log('No active session found');
-      //   return null;
-      // }
-      
-      const user = await this.account.get();
-      return user;
+      return await this.account.get();
     } catch (error) {
       console.log('Appwrite service :: getCurrentUser :: error', error);
       return null;
@@ -96,43 +71,10 @@ class AppwriteService {
   async signOut() {
     try {
       await this.account.deleteSessions();
-      console.log('All sessions deleted successfully');
       return true;
     } catch (error) {
       console.log('Appwrite service :: signOut :: error', error);
       return false;
-    }
-  }
-
-  // Method to get current session info
-  async getCurrentSession() {
-    try {
-      return await this.account.getSession('current');
-    } catch (error) {
-      console.log('Appwrite service :: getCurrentSession :: error', error);
-      return null;
-    }
-  }
-
-  // Method to list all sessions
-  async listSessions() {
-    try {
-      return await this.account.listSessions();
-    } catch (error) {
-      console.log('Appwrite service :: listSessions :: error', error);
-      return null;
-    }
-  }
-
-  // Initialize authentication on app startup
-  async initializeAuth() {
-    try {
-      const user = await this.account.get();
-      console.log('User authenticated on startup:', user.$id);
-      return user;
-    } catch (error) {
-      console.log('No authenticated user found on startup');
-      return null;
     }
   }
 
@@ -169,52 +111,140 @@ class AppwriteService {
     }
   }
 
-  async updateUserProfile(documentId: string, data: any) {
+  // Health Profile Methods
+  async createHealthProfile(userId: string, healthProfile: UserHealthProfile) {
     try {
+      // Convert the health profile to a format suitable for Appwrite
+      const healthProfileData = {
+        userId,
+        allergies: JSON.stringify(healthProfile.allergies || []),
+        medicalConditions: JSON.stringify(healthProfile.medicalConditions || []),
+        currentMedications: JSON.stringify(healthProfile.currentMedications || []),
+        dietaryRestrictions: JSON.stringify(healthProfile.dietaryRestrictions || []),
+        emergencyContacts: JSON.stringify(healthProfile.emergencyContacts || []),
+        bloodType: healthProfile.bloodType || '',
+        dateOfBirth: healthProfile.dateOfBirth || '',
+        weight: healthProfile.weight || 0,
+        height: healthProfile.height || 0,
+        additionalNotes: healthProfile.additionalNotes || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      return await this.databases.createDocument(
+        APPWRITE_DATABASE_ID,
+        APPWRITE_HEALTH_PROFILE_COLLECTION_ID,
+        ID.unique(),
+        healthProfileData
+      );
+    } catch (error) {
+      console.log('Appwrite service :: createHealthProfile :: error', error);
+      throw error;
+    }
+  }
+
+  async updateHealthProfile(documentId: string, healthProfile: UserHealthProfile) {
+    try {
+      // Convert the health profile to a format suitable for Appwrite
+      const healthProfileData = {
+        allergies: JSON.stringify(healthProfile.allergies || []),
+        medicalConditions: JSON.stringify(healthProfile.medicalConditions || []),
+        currentMedications: JSON.stringify(healthProfile.currentMedications || []),
+        dietaryRestrictions: JSON.stringify(healthProfile.dietaryRestrictions || []),
+        emergencyContacts: JSON.stringify(healthProfile.emergencyContacts || []),
+        bloodType: healthProfile.bloodType || '',
+        dateOfBirth: healthProfile.dateOfBirth || '',
+        weight: healthProfile.weight || 0,
+        height: healthProfile.height || 0,
+        additionalNotes: healthProfile.additionalNotes || '',
+        updatedAt: new Date().toISOString(),
+      };
+
       return await this.databases.updateDocument(
         APPWRITE_DATABASE_ID,
-        APPWRITE_USER_COLLECTION_ID,
+        APPWRITE_HEALTH_PROFILE_COLLECTION_ID,
         documentId,
-        data
+        healthProfileData
       );
     } catch (error) {
-      console.log('Appwrite service :: updateUserProfile :: error', error);
+      console.log('Appwrite service :: updateHealthProfile :: error', error);
       throw error;
     }
   }
 
-  async deleteUserProfile(documentId: string) {
+  async getHealthProfile(userId: string) {
     try {
-      return await this.databases.deleteDocument(
+      const response = await this.databases.listDocuments(
         APPWRITE_DATABASE_ID,
-        APPWRITE_USER_COLLECTION_ID,
-        documentId
+        APPWRITE_HEALTH_PROFILE_COLLECTION_ID,
+        [
+          Query.equal('userId', userId)
+        ]
       );
+
+      if (response.documents.length > 0) {
+        const doc = response.documents[0];
+        // Parse JSON fields back to arrays/objects
+        return {
+          $id: doc.$id,
+          userId: doc.userId,
+          allergies: JSON.parse(doc.allergies || '[]'),
+          medicalConditions: JSON.parse(doc.medicalConditions || '[]'),
+          currentMedications: JSON.parse(doc.currentMedications || '[]'),
+          dietaryRestrictions: JSON.parse(doc.dietaryRestrictions || '[]'),
+          emergencyContacts: JSON.parse(doc.emergencyContacts || '[]'),
+          bloodType: doc.bloodType || '',
+          dateOfBirth: doc.dateOfBirth || '',
+          weight: doc.weight || 0,
+          height: doc.height || 0,
+          additionalNotes: doc.additionalNotes || '',
+          createdAt: doc.createdAt,
+          updatedAt: doc.updatedAt,
+        };
+      }
+
+      return null;
     } catch (error) {
-      console.log('Appwrite service :: deleteUserProfile :: error', error);
+      console.log('Appwrite service :: getHealthProfile :: error', error);
+      return null;
+    }
+  }
+
+  async createOrUpdateHealthProfile(userId: string, healthProfile: UserHealthProfile) {
+    try {
+      // First, check if a health profile already exists for this user
+      console.log("******************healthProfile", healthProfile);
+      const existingProfile = await this.getHealthProfile(userId);
+
+      if (existingProfile) {
+        // Update existing profile
+        return await this.updateHealthProfile(existingProfile.$id, healthProfile);
+      } else {
+        // Create new profile
+        return await this.createHealthProfile(userId, healthProfile);
+      }
+    } catch (error) {
+      console.log('Appwrite service :: createOrUpdateHealthProfile :: error', error);
       throw error;
     }
   }
 
-  // Debug method to check authentication state
-  async debugAuth() {
+  async deleteHealthProfile(userId: string) {
     try {
-      console.log('=== Auth Debug Info ===');
+      const existingProfile = await this.getHealthProfile(userId);
       
-      const sessions = await this.account.listSessions();
-      console.log('Active sessions:', sessions.total);
-      
-      const currentSession = await this.account.getSession('current');
-      console.log('Current session ID:', currentSession?.$id);
-      
-      const user = await this.account.get();
-      console.log('Current user ID:', user?.$id);
-      console.log('User email verified:', user?.emailVerification);
-      
-      return { sessions, currentSession, user };
+      if (existingProfile) {
+        return await this.databases.deleteDocument(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_HEALTH_PROFILE_COLLECTION_ID,
+          existingProfile.$id
+        );
+      }
+
+      return true;
     } catch (error) {
-      console.log('Debug auth error:', error);
-      return null;
+      console.log('Appwrite service :: deleteHealthProfile :: error', error);
+      throw error;
     }
   }
 }
@@ -225,8 +255,5 @@ export default appwriteService;
 
 // Export config for easy access
 export {
-  APPWRITE_ENDPOINT,
-  APPWRITE_PROJECT_ID,
-  APPWRITE_DATABASE_ID,
-  APPWRITE_USER_COLLECTION_ID,
+  APPWRITE_DATABASE_ID, APPWRITE_ENDPOINT, APPWRITE_HEALTH_PROFILE_COLLECTION_ID, APPWRITE_PROJECT_ID, APPWRITE_USER_COLLECTION_ID
 };
