@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "RxScan",
-    "slug": "RxScan",
+    "name": "jsm_first_project",
+    "slug": "jsm_first_project",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "rxscan",
+    "scheme": "jsmfirstproject",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
