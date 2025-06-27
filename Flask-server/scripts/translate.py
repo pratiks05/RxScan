@@ -86,6 +86,6 @@ def main():
         output_file=f"prescription_transcription_{lang.lower()}.txt"
     )
     
-if __name__ == "__main__":
+if __name__ == "__main__":  
     languages = ["Hindi", "Bengali", "Tamil", "Telugu", "Marathi", "Gujarati", "Punjabi", "Kannada", "Malayalam"]
     main()

@@ -8,11 +8,12 @@ import json
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
+import tempfile
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Your PrescriptionOCR class (copy the entire class from your paste.txt here)
+# Your PrescriptionOCR class
 class PrescriptionOCR:
     def __init__(self, api_key):
         """Initialize Prescription OCR with API key"""
@@ -120,6 +121,59 @@ class PrescriptionOCR:
                 'error': f"Error processing prescription: {str(e)}"
             }
 
+# GeminiTranslator class
+class GeminiTranslator:
+    def __init__(self, api_key):
+        """Initialize Gemini Translator with API key"""
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    
+    def translate_text_with_context(self, text, target_language, context_info=""):
+        """
+        Translate text with additional context for better accuracy
+        
+        Args:
+            text (str): Text to translate
+            target_language (str): Target language
+            context_info (str): Additional context (e.g., "medical document", "technical manual")
+        
+        Returns:
+            dict: Translation result with success status and translated text
+        """
+        try:
+            context_prompt = ""
+            if context_info:
+                context_prompt = f"This is a {context_info}. Please translate accordingly with appropriate terminology."
+            
+            prompt = f"""
+            Please translate the following English text to {target_language}.
+            {context_prompt}
+            
+            Maintain the original formatting, paragraph breaks, and style.
+            Provide a natural, fluent translation that preserves the meaning and tone.
+            
+            Text to translate:
+            {text}
+            """
+            
+            response = self.model.generate_content(prompt)
+            translated_text = response.text
+            
+            return {
+                'success': True,
+                'original_text': text,
+                'translated_text': translated_text,
+                'target_language': target_language,
+                'context_info': context_info,
+                'translation_date': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Error in translation: {str(e)}"
+            }
+
 # Flask app setup
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -134,8 +188,9 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in environment variables. Please set it in your .env file.")
 
-# Initialize OCR with API key from environment
+# Initialize OCR and Translator with API key from environment
 ocr = PrescriptionOCR(GEMINI_API_KEY)
+translator = GeminiTranslator(GEMINI_API_KEY)
 
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
@@ -182,11 +237,102 @@ def extract_prescription():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/translate', methods=['POST'])
+def translate_text():
+    """API endpoint to translate text with context using Gemini"""
+    try:
+        # Get JSON data from request
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON data provided'}), 400
+        
+        text = data.get('text')
+        target_language = data.get('target_language')
+        
+        if not text:
+            return jsonify({'success': False, 'error': 'Text field is required'}), 400
+        
+        if not target_language:
+            return jsonify({'success': False, 'error': 'Target language field is required'}), 400
+        
+        # Optional context information
+        context_info = data.get('context_info', '')
+        
+        # Perform translation
+        result = translator.translate_text_with_context(
+            text=text,
+            target_language=target_language,
+            context_info=context_info
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/translate-file', methods=['POST'])
+def translate_file():
+    """API endpoint to translate text file with context"""
+    try:
+        # Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        
+        # Check if file is selected
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+        # Check if file is a text file
+        if not file.filename.lower().endswith('.txt'):
+            return jsonify({'success': False, 'error': 'Only .txt files are allowed'}), 400
+        
+        # Get form data
+        target_language = request.form.get('target_language')
+        context_info = request.form.get('context_info', '')
+        
+        if not target_language:
+            return jsonify({'success': False, 'error': 'Target language is required'}), 400
+        
+        # Read file content
+        file_content = file.read().decode('utf-8')
+        
+        # Perform translation
+        result = translator.translate_text_with_context(
+            text=file_content,
+            target_language=target_language,
+            context_info=context_info
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/languages', methods=['GET'])
+def get_supported_languages():
+    """API endpoint to get list of supported languages"""
+    languages = [
+        "Hindi", "Bengali", "Tamil", "Telugu", "Marathi", 
+        "Gujarati", "Punjabi", "Kannada", "Malayalam",
+        "Spanish", "French", "German", "Italian", "Portuguese",
+        "Chinese", "Japanese", "Korean", "Russian", "Arabic"
+    ]
+    
+    return jsonify({
+        'success': True,
+        'languages': languages,
+        'total': len(languages)
+    })
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
 if __name__ == '__main__':
-    print("Starting Prescription OCR Flask Server...")
+    print("Starting Prescription OCR & Translation Flask Server...")
     app.run(debug=True, host='0.0.0.0', port=5000)
