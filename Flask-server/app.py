@@ -86,10 +86,24 @@ class PrescriptionOCR:
             }
             
             Rules:
-            - Use null for any information that cannot be read or is not present
-            - For uncertain readings, include the text and set "uncertain": true
-            - Return ONLY the JSON object, no other text
-            - Ensure all JSON syntax is correct
+            
+            1. Use **null** for fields that are absent or unreadable.  
+            2. If any reading is doubtful, copy the raw text into `instructions` and set `"uncertain": true`.
+
+            3. **Interpreting timing codes**
+
+            • `1` or `X`  =  **take**  
+            • `0` or `O`  =  **skip** **unless** the code has **only O-O**, then treat each O as **take**.  
+            • Code length → times:  
+                - 1 slot → once daily  
+                - 2 slots → morning & night  
+                - 3 slots → morning, afternoon, night  
+                - 4 slots → every 6 hours  
+            • Expand the code into clear English in `frequency`, repeating any fractional dose in each phrase.
+
+            4. If brand name is given in prescription, output brand name. Don't convert it to generic drug name.
+                If dosage is mentioned with name, let it be mentioned in the name, besides giving it seperately in the output. For example, if "Rantac 300" is given, output that, not "Rantac" or "Ranitidine".
+            5. Output only the final JSON – no other text, commentary, or markup.
             """
             
             response = self.model.generate_content([prompt, image])
