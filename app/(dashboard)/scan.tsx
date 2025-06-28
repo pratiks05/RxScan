@@ -90,7 +90,7 @@ export default function EnhancedPrescriptionOCR() {
   const [validationResults, setValidationResults] = useState<any>(null);
 
   // Replace with your actual API base URL
-  const API_BASE_URL = 'https://3744-14-194-180-252.ngrok-free.app';
+  const API_BASE_URL = 'https://648b-14-194-180-252.ngrok-free.app';
 
   const scanOptions = [
     {
