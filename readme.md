@@ -59,17 +59,6 @@ RxScan is an innovative healthcare application designed to bridge the gap in pre
 - **Gemini 2.0 Flash** - OCR & Translation capabilities
 - **gTTS (Google Text-to-Speech)** - Voice synthesis
 
-## 📱 Complete Workflow
-
-```mermaid
-    A[📸 Capture Prescription] --> B[🤖 AI Processing]
-    B --> C[📝 Text Extraction]
-    C --> D[🌐 Translation]
-    D --> E[🔊 Text-to-Speech]
-    E --> F[💾 Save to Profile]
-    F --> G[⏰ Set Reminders]
-```
-
 ## 🛠️ Installation & Setup
 
 ### Prerequisites
